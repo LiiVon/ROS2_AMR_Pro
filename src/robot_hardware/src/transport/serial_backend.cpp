@@ -90,4 +90,125 @@ namespace robot_hardware::transport
             return true;
         }
     }
+
+    SerialBackend::SerialBackend(BackendConfig config) : config_(std::move(config)) {}
+
+    SerialBackend::~SerialBackend()
+    {
+        Close();
+    }
+
+    std::string SerialBackend::Name() const
+    {
+        return "serial";
+    }
+
+    BackendKind SerialBackend::Kind() const
+    {
+        return BackendKind::kSerial;
+    }
+
+    bool SerialBackend::Open(std::string *error)
+    {
+        // 先关闭旧串口
+        Close();
+
+        // 读写、非控制终端、非阻塞方式打开串口设备
+        fd_ = open(config_.serial_device.c_str(), O_RDWR | O_NOCTTY | O_NONBLOCK);
+        if (fd_ < 0)
+        {
+            if (error)
+            {
+                *error = "Failed to open serial device: " + std::string(std::strerror(errno));
+            }
+            return false;
+        }
+
+        std::string config_error;
+        if (!ConfigureSerialPort(fd_, config_.serial_baud, &config_error))
+        {
+            if (error)
+            {
+                *error = "Failed to configure serial port: " + config_error;
+            }
+            Close();
+            return false;
+        }
+        return true;
+    }
+
+    void SerialBackend::Close()
+    {
+        if (fd_ >= 0)
+        {
+            close(fd_);
+            fd_ = -1;
+        }
+    }
+
+    bool SerialBackend::IsOpen() const
+    {
+        return fd_ >= 0;
+    }
+
+    bool SerialBackend::WriteCommand(const Command &command, std::string *error)
+    {
+        if (!IsOpen())
+        {
+            if (error)
+            {
+                *error = "Serial port is not open.";
+            }
+            return false;
+        }
+
+        // 将内存数据结构中的数据  转换成真正需要发送的数据
+        const auto binary_packet = EncodeMickSpeedCommand(command);
+        const std::string test_packet = EncodeCommand(command);
+
+        const char *data = config_.protocol == "mick_binary" ? reinterpret_cast<const char *>(binary_packet.data()) : test_packet.data();
+        const std::size_t size = config_.protocol == "mick_binary" ? binary_packet.size() : test_packet.size();
+
+        // 把数据交给 Linux 串口驱动
+        const ssize_t written = write(fd_, data, size);
+        if (written < 0)
+        {
+            if (error)
+            {
+                *error = "Failed to write to serial port: " + std::string(std::strerror(errno));
+            }
+            return false;
+        }
+        return written >= 0 || errno == EAGAIN || errno == EWOULDBLOCK;
+    }
+
+    std::optional<std::string> SerialBackend::Read(std::string *error)
+    {
+        if (!IsOpen())
+        {
+            if (error)
+            {
+                *error = "Serial port is not open.";
+            }
+            return std::nullopt;
+        }
+
+        char buffer[512];
+        const ssize_t bytes_read = read(fd_, buffer, sizeof(buffer));
+        if (bytes_read < 0)
+        {
+            if (error)
+            {
+                *error = "Failed to read from serial port: " + std::string(std::strerror(errno));
+            }
+            return std::nullopt;
+        }
+        else if (bytes_read == 0)
+        {
+            // No data available
+            return std::nullopt;
+        }
+
+        return std::optional<std::string>(std::string(buffer, bytes_read));
+    }
 }

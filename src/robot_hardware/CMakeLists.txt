@@ -13,7 +13,13 @@ find_package(ament_cmake REQUIRED)
 
 add_library(robot_hardware_backends SHARED
   src/protocol/packet.cpp
-  src/kinematics/kinematcis.cpp)
+  src/kinematics/kinematcis.cpp
+  src/transport/backend_factory.cpp
+  src/transport/mock_backend.cpp
+  src/transport/serial_backend.cpp
+  src/transport/udp_backend.cpp
+  src/system/adapter.cpp
+)
 
 target_include_directories(robot_hardware_backends PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -26,6 +32,9 @@ if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
   ament_add_gtest(chassis_packet_test test/chassis_packet_test.cpp)
   target_link_libraries(chassis_packet_test robot_hardware_backends)
+
+  ament_add_gtest(chassis_system_adapter_test test/chassis_system_adapter_test.cpp)
+  target_link_libraries(chassis_system_adapter_test robot_hardware_backends)
 endif()
 
 ament_package()

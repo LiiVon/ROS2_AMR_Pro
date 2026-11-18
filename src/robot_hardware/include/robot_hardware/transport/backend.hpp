@@ -9,6 +9,7 @@ namespace robot_hardware::transport
 {
     using robot_hardware::protocol::Command;
 
+    // 后端配置结构体，包含串口和 UDP 的配置参数
     struct BackendConfig
     {
         // 串口配置 通过 USB 转串口连接底盘
@@ -25,6 +26,7 @@ namespace robot_hardware::transport
         std::string protocol{"text"};
     };
 
+    // 后端类型枚举类，表示不同的通信后端类型
     enum class BackendKind
     {
         kMock,
@@ -32,6 +34,7 @@ namespace robot_hardware::transport
         kUdp,
     };
 
+    // 将 BackendKind 枚举类型转换为字符串表示
     inline const char *ToString(BackendKind kind)
     {
         switch (kind)
@@ -47,6 +50,7 @@ namespace robot_hardware::transport
         }
     }
 
+    // 后端抽象基类，定义了底盘通信的接口
     class Backend
     {
     public:

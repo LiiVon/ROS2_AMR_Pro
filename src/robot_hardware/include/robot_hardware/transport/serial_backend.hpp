@@ -11,7 +11,9 @@ namespace robot_hardware::transport
     class SerialBackend final : public Backend
     {
     public:
-        SerialBackend() = default;
+        explicit SerialBackend(BackendConfig config);
+        ~SerialBackend() override;
+        
         std::string Name() const override;
         BackendKind Kind() const override;
 

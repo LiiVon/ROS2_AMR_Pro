@@ -3,6 +3,5 @@ build/
 install/
 .vscode/
 /robot/
-*.md
 experiment_results.*
 compile_commands.json

@@ -11,7 +11,9 @@ namespace robot_hardware::transport
     class UdpBackend final : public Backend
     {
     public:
-        UdpBackend() = default;
+        explicit UdpBackend(BackendConfig config);
+        ~UdpBackend() override;
+
         std::string Name() const override;
         BackendKind Kind() const override;
 
@@ -23,7 +25,6 @@ namespace robot_hardware::transport
         std::optional<std::string> Read(std::string *error) override;
 
     private:
-        bool open_ = false;       // UDP 是否已打开
         int fd_ = -1;             // UDP socket 文件描述符
         sockaddr_in remote_addr_{}; // UDP 目标地址
         BackendConfig config_;    // 后端配置

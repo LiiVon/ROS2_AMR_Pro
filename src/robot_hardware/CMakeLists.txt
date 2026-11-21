@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.8)
 project(robot_hardware)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
@@ -23,20 +23,57 @@ find_package(rclcpp_lifecycle REQUIRED)
 
 add_library(robot_hardware_backends SHARED
   src/protocol/packet.cpp
-  src/kinematics/kinematcis.cpp
+  src/kinematics/kinematics.cpp
   src/transport/backend_factory.cpp
   src/transport/mock_backend.cpp
   src/transport/serial_backend.cpp
   src/transport/udp_backend.cpp
   src/system/adapter.cpp
 )
-
 target_include_directories(robot_hardware_backends PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
 )
 set_target_properties(robot_hardware_backends PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
+add_library(robot_chassis_hardware SHARED
+  src/ros/hardware_interface.cpp)
+target_link_libraries(robot_chassis_hardware robot_hardware_backends)
+ament_target_dependencies(robot_chassis_hardware robot_interfaces_core hardware_interface pluginlib rclcpp rclcpp_lifecycle)
+pluginlib_export_plugin_description_file(hardware_interface robot_hardware_plugins.xml)
+
+add_executable(chassis_driver_node src/nodes/chassis_driver_node.cpp)
+target_link_libraries(chassis_driver_node robot_hardware_backends)
+ament_target_dependencies(chassis_driver_node
+  rclcpp geometry_msgs nav_msgs sensor_msgs std_srvs tf2_ros  robot_interfaces_core)
+
+add_executable(chassis_simulator_node src/nodes/chassis_simulator_node.cpp)
+target_link_libraries(chassis_simulator_node robot_hardware_backends)
+ament_target_dependencies(chassis_simulator_node rclcpp)
+
+add_executable(odom_path_recorder_node src/nodes/odom_path_recorder_node.cpp)
+ament_target_dependencies(odom_path_recorder_node rclcpp nav_msgs std_srvs)
+
+install(TARGETS robot_hardware_backends robot_chassis_hardware
+  EXPORT export_robot_hardware_backends
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+)
+
+install(TARGETS chassis_driver_node chassis_simulator_node odom_path_recorder_node
+  DESTINATION lib/${PROJECT_NAME}
+)
+install(DIRECTORY include/
+  DESTINATION include
+)
+
+install(DIRECTORY config launch
+  DESTINATION share/${PROJECT_NAME})
+
+install(FILES robot_hardware_plugins.xml
+  DESTINATION share/${PROJECT_NAME}
+)
 
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
@@ -45,6 +82,15 @@ if(BUILD_TESTING)
 
   ament_add_gtest(chassis_system_adapter_test test/chassis_system_adapter_test.cpp)
   target_link_libraries(chassis_system_adapter_test robot_hardware_backends)
+
+  ament_add_gtest(chassis_hardware_interface_test test/chassis_hardware_interface_test.cpp)
+  target_link_libraries(chassis_hardware_interface_test robot_chassis_hardware)
+  ament_target_dependencies(chassis_hardware_interface_test
+    robot_interfaces_core hardware_interface rclcpp rclcpp_lifecycle)
 endif()
+
+ament_export_include_directories(include)
+ament_export_targets(export_robot_hardware_backends HAS_LIBRARY_TARGET)
+ament_export_dependencies(hardware_interface pluginlib)
 
 ament_package()
